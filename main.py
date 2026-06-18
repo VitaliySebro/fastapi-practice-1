@@ -1,29 +1,36 @@
-from fastapi import FastAPI, HTTPException, status
+from contextlib import asynccontextmanager
 
-from settings.db import ping
+from fastapi import FastAPI
 
-# Ініціалізуємо додаток FastAPI
-app = FastAPI(
-    title="FastAPI Docker App",
-    description="Практична робота №2: Контейнеризація та асинхронна PostgreSQL",
-)
+# Імпортуємо Base. Через нього SQLAlchemy побачить усі моделі, які ми щойно зареєстрували
+from models import Base
+
+# Імпортуємо ваш асинхронний двигун бази даних
+from settings.db import engine
 
 
-# Базовий ендпойнт, який ви створили у першій практичній
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Код у цьому блоці виконується ОДИН РАЗ при СТАРТІ додатка
+    async with engine.begin() as conn:
+        # Автоматично створюємо всі таблиці в базі даних (User, Profile, Chat тощо)
+        await conn.run_sync(Base.metadata.create_all)
+        print("🎉 Базу даних успішно синхронізовано! Таблиці месенджера створено.")
+
+    yield  # Тут додаток запускається і чекає на запити користувачів
+
+    # Код тут виконується при ЗУПИНЦІ додатка
+    await engine.dispose()
+    print("💤 З'єднання з базою даних закрито.")
+
+
+# Створюємо додаток FastAPI та передаємо йому налаштований lifespan
+app = FastAPI(lifespan=lifespan)
+
+
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
-
-
-# Новий ендпойнт для перевірки зв'язку з базою даних
-@app.get("/healthcheck", status_code=status.HTTP_200_OK)
-async def db_healthcheck():
-    is_alive = await ping()  # Викликаємо функцію ping з файлу settings/db.py
-    if not is_alive:
-        # Якщо база не відповідає, повертаємо помилку 503 (Сервіс недоступний)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database connection failed",
-        )
-    # Якщо все добре, повертаємо успішний статус
-    return {"status": "healthy", "database": "connected"}
+    return {
+        "status": "success",
+        "message": "FastAPI працює, таблиці успішно згенеровано!",
+    }
