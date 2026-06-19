@@ -1,6 +1,4 @@
-# main.py
 import logging
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -8,34 +6,25 @@ from models.base import Base
 from models.product import (
     Product,  # Важливо імпортувати, щоб SQLAlchemy побачила модель
 )
+from routers.files import router as files_router  # <-- ДОДАНО імпорт роутера файлів
 
-# 1. Імпортуємо створений роутер
+# 1. Імпортуємо створені роутери
 from routers.products import router as products_router
 
 # Імпортуємо інструменти бази даних
 from settings.db import engine
 
-# # 2. Налаштовуємо базове виведення логів (змінюємо INFO на WARNING, щоб не було спаму)
+# 2. Налаштовуємо базове виведення логів
 logging.basicConfig(
     level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
+# Змінюємо опис на Практичну роботу №7
+app = FastAPI(title="Product Management API", description="Практична робота №7")
 
-# Функція, яка автоматично створить таблицю products при старті сервера
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logging.warning("Автоматичне створення таблиць бази даних...")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-
-
-app = FastAPI(
-    title="Product Management API", description="Практична робота №5", lifespan=lifespan
-)
-
-# # 3. Підключаємо роутер товарів до головного додатка (Обов'язково додаємо цей рядок!)
+# 3. Підключаємо роутери до головного додатка
 app.include_router(products_router)
+app.include_router(files_router)  # <-- ДОДАНО підключення роутера файлів
 
 
 @app.get("/")
